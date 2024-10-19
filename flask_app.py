@@ -8,6 +8,20 @@ from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
+import os
+from dotenv import load_dotenv
+from langchain_groq import ChatGroq
+from langchain_core.output_parsers import StrOutputParser
+load_dotenv()
+from langchain_core.messages import HumanMessage,SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+parser = StrOutputParser()
+
+translated_text_en = None
+
+groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key
 
 app = Flask(__name__)
 CORS(app)
@@ -25,23 +39,23 @@ def upload_image():
         return jsonify({"error": "No selected file"}), 400
 
     try:
-        # Read the image file into memory
+        
         img_bytes = file.read()
         image = Image.open(io.BytesIO(img_bytes))
 
-        # Perform OCR using Tesseract to extract text
+        
         text = pytesseract.image_to_string(image)
-
-        # Auto-detect the source language and translate to Hindi, Marathi, and English
+        global translated_text_en
+        
         translator_en = GoogleTranslator(source='auto', target='en')
         translator_hi = GoogleTranslator(source='auto', target='hi')
         translator_mr = GoogleTranslator(source='auto', target='mr')
 
-        translated_text_en = translator_en.translate(text)  # Translate to English
-        translated_text_hi = translator_hi.translate(text)  # Translate to Hindi
-        translated_text_mr = translator_mr.translate(text)  # Translate to Marathi
+        translated_text_en = translator_en.translate(text)  
+        translated_text_hi = translator_hi.translate(text)  
+        translated_text_mr = translator_mr.translate(text)  
 
-        # Return the original OCR result and translations
+        
         return jsonify({
             "OCR Result": text,
             "Translated to English": translated_text_en,
@@ -54,11 +68,39 @@ def upload_image():
 
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
-    user_input = request.json.get("message")
-    # Here you would implement your LangChain logic to get the response based on user_input
-    # For demonstration purposes, let's return a simple echo response.
-    response = f"You said: {user_input}"  # Replace this with your LangChain response
-    return jsonify({"response": response})
+    try:
+        
+        user_input = request.json.get("message")
+        if not user_input:
+            return jsonify({"error": "No message provided"}), 400
+
+        
+        model = ChatGroq(model="Gemma2-9b-It", groq_api_key=groq_api_key)
+
+       
+        global translated_text_en
+
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"The following text was extracted and translated: {translated_text_en}. You can interact based on this text."),
+            ("user", "{text}")
+        ])
+
+        
+        parser = StrOutputParser()
+
+        
+        chain = prompt | model | parser
+
+       
+        response = chain.invoke({"text": user_input})
+
+        
+        return jsonify({"response": response})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
