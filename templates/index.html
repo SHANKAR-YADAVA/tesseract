@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR and Translation with Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            font-weight: bold;
+        }
+        input[type="file"], select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #result {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        pre {
+            white-space: pre-wrap; /* Allows wrapping */
+            word-wrap: break-word; /* Break long words */
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #chat {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload an Image for OCR and Translation</h1>
+    
+    <form id="uploadForm" enctype="multipart/form-data">
+        <label for="imageFile">Choose an image:</label>
+        <input type="file" id="imageFile" name="image" accept="image/*" required>
+
+        <label for="language">Select a language for translation:</label>
+        <select id="language" name="language">
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="mr">Marathi</option>
+        </select>
+
+        <button type="submit">Upload and Translate</button>
+    </form>
+
+    <div id="result">
+        <h2>OCR Result:</h2>
+        <pre id="ocrText"></pre>
+        <h2>Translated Text:</h2>
+        <pre id="translatedText"></pre>
+    </div>
+
+    <div id="chat">
+        <h2>Chatbot:</h2>
+        <input type="text" id="chatInput" placeholder="Type your message here..." />
+        <button id="sendMessage">Send</button>
+        <div id="chatResponse"></div>
+    </div>
+
+    <script>
+        // Handle image upload and translation
+        const form = document.getElementById('uploadForm');
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent form submission
+            const fileInput = document.getElementById('imageFile');
+            const languageSelect = document.getElementById('language');
+            
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+            formData.append('language', languageSelect.value); // Add selected language
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('ocrText').textContent = data['OCR Result'] || 'No text found';
+                    document.getElementById('translatedText').textContent = 
+                        languageSelect.value === 'en' ? data['Translated to English'] :
+                        languageSelect.value === 'hi' ? data['Translated to Hindi'] :
+                        languageSelect.value === 'mr' ? data['Translated to Marathi'] :
+                        'No translation available';
+                } else {
+                    const errorData = await response.json();
+                    document.getElementById('ocrText').textContent = `Error: ${errorData.error}`;
+                }
+            } catch (error) {
+                document.getElementById('ocrText').textContent = `Error: ${error.message}`;
+            }
+        });
+
+        // Handle chatbot interaction
+        document.getElementById('sendMessage').addEventListener('click', async () => {
+            const userMessage = document.getElementById('chatInput').value;
+            const responseDiv = document.getElementById('chatResponse');
+
+            try {
+                const response = await fetch('/chatbot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: userMessage })
+                });
+
+                const data = await response.json();
+                responseDiv.innerHTML += `<p><strong>You:</strong> ${userMessage}</p>`;
+                responseDiv.innerHTML += `<p><strong>Bot:</strong> ${data.response}</p>`;
+                document.getElementById('chatInput').value = ''; // Clear input
+            } catch (error) {
+                responseDiv.innerHTML += `<p><strong>Error:</strong> ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
